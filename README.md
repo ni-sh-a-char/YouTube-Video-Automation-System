@@ -3,7 +3,6 @@
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)]()
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)]()
 [![GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-orange)]()
-[![License](https://img.shields.io/badge/License-MIT-green)]()
 
 **Fully Automated YouTube Video Generation & Upload System**
 
