@@ -12,8 +12,6 @@ Generate and upload trending tech videos to YouTube automatically every day at t
 
 ## ⚡ Quick Start (30 Minutes)
 
-🚀 **Want to deploy NOW?** Follow [QUICK_START.md](QUICK_START.md) for step-by-step instructions
-
 **System automatically:**
 - ✅ Generates viral video ideas daily (6 web sources)
 - ✅ Creates AI-powered scripts (11 scenes, 10 minutes)
@@ -27,18 +25,6 @@ Generate and upload trending tech videos to YouTube automatically every day at t
 3. Add GitHub Secrets (10 min)
 4. Test workflow (5 min)
 5. Watch your channel grow! 📈
-
----
-
-## 📚 Documentation Hub
-
-| Document | Purpose |
-|----------|---------|
-| **[QUICK_START.md](QUICK_START.md)** | **START HERE** - 30-minute setup guide |
-| [SYSTEM_OVERVIEW.md](SYSTEM_OVERVIEW.md) | Complete system architecture & features |
-| [GITHUB_ACTIONS_SETUP.md](GITHUB_ACTIONS_SETUP.md) | Detailed GitHub Actions configuration |
-| [DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md) | Step-by-step deployment verification |
-| [PRODUCTION_ENV_CONFIG.md](PRODUCTION_ENV_CONFIG.md) | Environment variables reference |
 
 ---
 
