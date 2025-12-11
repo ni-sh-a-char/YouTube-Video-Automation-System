@@ -33,37 +33,61 @@ class YouTubeUploader:
         self.authenticate()
     
     def authenticate(self):
-        """Authenticate with YouTube API"""
+        """Authenticate with YouTube API using environment variables"""
         
         creds = None
         
         # Check if we have a cached token
         if os.path.exists(self.token_file):
-            with open(self.token_file, 'rb') as token:
-                creds = pickle.load(token)
-        
-        # If no valid credentials, get new ones
+            try:
+                with open(self.token_file, 'rb') as token:
+                    creds = pickle.load(token)
+            except Exception as e:
+                print(f"⚠️ Could not load cached token: {e}")
+
+        # If no valid credentials, create from environment variables
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                if not os.path.exists(self.credentials_file):
-                    print(f"❌ {self.credentials_file} not found!")
-                    print("\n📖 SETUP INSTRUCTIONS:")
-                    print("1. Go to: https://console.cloud.google.com")
-                    print("2. Create a new project")
-                    print("3. Enable YouTube Data API v3")
-                    print("4. Create OAuth 2.0 credentials (Desktop app)")
-                    print("5. Download JSON and save as 'credentials.json'")
-                    return
+                try:
+                    creds.refresh(Request())
+                except Exception as e:
+                    print(f"⚠️ Token refresh failed: {e}")
+                    creds = None
+
+            if not creds:
+                # Load from environment variables
+                client_id = os.getenv('YOUTUBE_CLIENT_ID')
+                client_secret = os.getenv('YOUTUBE_CLIENT_SECRET')
+                refresh_token = os.getenv('YOUTUBE_REFRESH_TOKEN')
                 
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.credentials_file, self.SCOPES)
-                creds = flow.run_local_server(port=0)
-            
+                if client_id and client_secret and refresh_token:
+                    print("🔄 Authenticating via Environment Variables...")
+                    creds = Credentials(
+                        token=None,
+                        refresh_token=refresh_token,
+                        token_uri="https://oauth2.googleapis.com/token",
+                        client_id=client_id,
+                        client_secret=client_secret,
+                        scopes=self.SCOPES
+                    )
+                else:
+                    # Fallback to file-based auth (legacy support or local dev without env vars)
+                    if os.path.exists(self.credentials_file):
+                         print("⚠️ Environment variables missing, falling back to file-based auth...")
+                         flow = InstalledAppFlow.from_client_secrets_file(
+                            self.credentials_file, self.SCOPES)
+                         creds = flow.run_local_server(port=0)
+                    else:
+                        print("❌ YouTube Authentication Failed: No environment variables or credentials file found.")
+                        print("   Required ENV vars: YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN")
+                        return
+
             # Save token for next time
-            with open(self.token_file, 'wb') as token:
-                pickle.dump(creds, token)
+            try:
+                with open(self.token_file, 'wb') as token:
+                    pickle.dump(creds, token)
+            except Exception as e:
+                print(f"⚠️ Could not save token cache: {e}")
         
         self.youtube = build('youtube', 'v3', credentials=creds)
         print("✅ YouTube authentication successful")

@@ -1,10 +1,15 @@
-from kokoro import KPipeline
-import soundfile as sf
-import torch
+from gtts import gTTS
+import os
 
-def gen_voice(prompt, audio_path, lang_code='b', voice='bm_lewis'):
-    pipeline = KPipeline(lang_code)
-    generator = pipeline(prompt, voice=voice)
-    for i, (gs, ps, audio) in enumerate(generator):
-        print(i, gs, ps)
-        sf.write(audio_path, audio, 24000)
+def gen_voice(prompt, audio_path, lang_code='en', voice=None):
+    """
+    Generate voice using Google Text-to-Speech (gTTS).
+    Lightweight, no GPU required.
+    """
+    try:
+        print(f"[*] Generating voice via gTTS: {prompt[:30]}...")
+        tts = gTTS(text=prompt, lang=lang_code, slow=False)
+        tts.save(audio_path)
+        print(f"[OK] Audio saved to {audio_path}")
+    except Exception as e:
+        print(f"[!] Error generating voice: {e}")

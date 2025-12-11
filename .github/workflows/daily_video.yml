@@ -2,8 +2,8 @@ name: Daily YouTube Video Generation
 
 on:
   schedule:
-    # Runs every day at 6 PM UTC (peak engagement time for YouTube)
-    - cron: '0 18 * * *'
+    # Runs every day at 3 PM UTC (10 AM EST - Viral Time for Tech)
+    - cron: '0 15 * * *'
   # Allow manual trigger for testing
   workflow_dispatch:
 
@@ -11,6 +11,33 @@ jobs:
   generate-and-upload:
     runs-on: ubuntu-latest
     
+    env:
+      LLM_PROVIDER: groq
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GROQ_MODEL: openai/gpt-oss-120b
+      YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+      YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+      YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+      VIDEO_RESOLUTION: 1080x1920
+      VIDEO_FPS: 30
+      TARGET_VIDEO_DURATION: 600
+      OUTPUT_FORMAT: longform
+      CONTENT_NICHE: tech/coding
+      TOPICS_ROTATION: Python Tricks,JavaScript Tips,React Patterns,TypeScript Advanced,SQL Optimization,Git Hacks,Docker Best Practices,Kubernetes Patterns,API Design,System Design,DevOps Tools,CI/CD Pipelines,Cloud Architecture,Microservices,Database Design,Redis Caching,Message Queues,Serverless Computing,Machine Learning,Neural Networks,AI Trends,LLM Tips,Prompt Engineering,Web Security,Linux Commands,Terminal Productivity,VS Code Hacks,GitHub Actions,Debugging Techniques,Code Review Best Practices
+      UPLOAD_SCHEDULE_HOUR: 15
+      LOCAL_TIMEZONE: UTC
+      YOUTUBE_PRIVACY_STATUS: public
+      YOUTUBE_CATEGORY_ID: 28
+      AUTO_UPLOAD: true
+      CLEANUP_TEMP: true
+      CLEANUP_AFTER_UPLOAD: true
+      KEEP_INTERMEDIATE_FILES: false
+      BATCH_SIZE: 1
+      PRODUCTION_MODE: true
+      DRY_RUN: false
+      LOG_LEVEL: INFO
+      VERBOSE: false
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,78 +55,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Create .env file from secrets
-        env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+      - name: Run Automation Pipeline
         run: |
-          cat > .env << EOF
-          LLM_PROVIDER=groq
-          GROQ_API_KEY=$GROQ_API_KEY
-          GROQ_MODEL=openai/gpt-oss-120b
-          
-          YOUTUBE_CLIENT_ID=$YOUTUBE_CLIENT_ID
-          YOUTUBE_CLIENT_SECRET=$YOUTUBE_CLIENT_SECRET
-          YOUTUBE_REFRESH_TOKEN=$YOUTUBE_REFRESH_TOKEN
-          
-          VIDEO_RESOLUTION=1080x1920
-          VIDEO_FPS=30
-          TARGET_VIDEO_DURATION=600
-          OUTPUT_FORMAT=longform
-          
-          CONTENT_NICHE=tech/coding
-          TOPICS_ROTATION=Python Tricks,JavaScript Tips,React Patterns,TypeScript Advanced,SQL Optimization,Git Hacks,Docker Best Practices,Kubernetes Patterns,API Design,System Design,DevOps Tools,CI/CD Pipelines,Cloud Architecture,Microservices,Database Design,Redis Caching,Message Queues,Serverless Computing,Machine Learning,Neural Networks,AI Trends,LLM Tips,Prompt Engineering,Web Security,Linux Commands,Terminal Productivity,VS Code Hacks,GitHub Actions,Debugging Techniques,Code Review Best Practices
-          
-          UPLOAD_SCHEDULE_HOUR=18
-          LOCAL_TIMEZONE=UTC
-          YOUTUBE_PRIVACY_STATUS=public
-          YOUTUBE_CATEGORY_ID=28
-          
-          CLEANUP_TEMP=true
-          CLEANUP_AFTER_UPLOAD=true
-          KEEP_INTERMEDIATE_FILES=false
-          
-          BATCH_SIZE=1
-          PRODUCTION_MODE=true
-          DRY_RUN=false
-          
-          LOG_LEVEL=INFO
-          VERBOSE=false
-          EOF
-
-      - name: Create credentials.json from secrets
-        env:
-          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
-        run: |
-          echo "$CREDENTIALS_JSON" > credentials.json
-
-      - name: Create client_secrets.json from secrets
-        env:
-          CLIENT_SECRETS_JSON: ${{ secrets.CLIENT_SECRETS_JSON }}
-        run: |
-          echo "$CLIENT_SECRETS_JSON" > client_secrets.json
-
-      - name: Generate viral video idea
-        run: |
-          echo "📌 Generating viral idea from web sources..."
-          python ai/gen_ideas.py
-
-      - name: Generate video script
-        run: |
-          echo "📝 Creating AI-optimized script..."
-          python ai/gen_script.py
-
-      - name: Create video
-        run: |
-          echo "🎬 Composing video..."
-          python make_video.py
-
-      - name: Upload to YouTube
-        run: |
-          echo "📤 Uploading to YouTube..."
-          python main_orchestrator.py
+          echo "🚀 Starting Daily YouTube Automation..."
+          python main_orchestrator.py --run
 
       - name: Cleanup temporary files
         if: always()
@@ -108,9 +67,6 @@ jobs:
           rm -rf output/temp
           rm -rf temp
           rm -f *.mp4.tmp
-          rm -f .env
-          rm -f credentials.json
-          rm -f client_secrets.json
           rm -rf __pycache__
           find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 

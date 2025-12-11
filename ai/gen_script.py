@@ -94,7 +94,7 @@ Return ONLY valid JSON with 11 scenes, each unique and dynamic to {keyword}:
 """
         
         try:
-            message = self.client.messages.create(
+            chat_completion = self.client.chat.completions.create(
                 model="openai/gpt-oss-120b",
                 max_tokens=4500,
                 messages=[
@@ -102,7 +102,7 @@ Return ONLY valid JSON with 11 scenes, each unique and dynamic to {keyword}:
                 ]
             )
             
-            response_text = message.content[0].text
+            response_text = chat_completion.choices[0].message.content
             
             # Extract JSON from response
             json_match = re.search(r'\{[\s\S]*\}', response_text)

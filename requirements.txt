@@ -1,13 +1,6 @@
 moviepy==2.1.2
-diffusers
-torch
-transformers
 pysrt
 openai-whisper
-soundfile
-kokoro
-accelerate
-urllib3<2.0.0
 google-auth-oauthlib
 google-auth-httplib2
 google-api-python-client
@@ -16,3 +9,4 @@ pillow
 groq
 schedule
 python-dotenv
+gTTS

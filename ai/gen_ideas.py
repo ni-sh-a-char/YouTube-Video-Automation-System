@@ -227,13 +227,13 @@ Return ONLY a JSON response (no markdown, no extra text) with:
     "viral_score": <85-99>
 }}"""
 
-            message = self.client.messages.create(
+            chat_completion = self.client.chat.completions.create(
                 model="openai/gpt-oss-120b",
                 max_tokens=300,
                 messages=[{"role": "user", "content": prompt}]
             )
             
-            response_text = message.content[0].text.strip()
+            response_text = chat_completion.choices[0].message.content.strip()
             
             # Try to extract JSON from response
             try:

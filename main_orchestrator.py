@@ -25,7 +25,7 @@ except ImportError:
 
 from ai.gen_ideas import ViralIdeaGenerator
 from ai.gen_script import ScriptGenerator
-from ai.gen_image import gen_image
+from ai.gen_image import gen_image, gen_thumbnail
 from ai.gen_voice import gen_voice
 from ai.gen_subs import gen_subs
 from seo_optimizer import SEOOptimizer
@@ -33,11 +33,12 @@ from thumbnail_generator import ThumbnailGenerator
 from youtube_uploader import YouTubeUploader
 
 # Configure logging
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('automation.log'),
+        logging.FileHandler('automation.log', encoding='utf-8'),
         logging.StreamHandler()
     ]
 )
@@ -54,11 +55,10 @@ class AutomationConfig:
     - config.json (system configuration)
     """
     
-    def __init__(self, config_file: str = 'config.json'):
-        self.config_file = config_file
-        self.config = self.load_config()
-        self.credentials = self.load_credentials()
+    def __init__(self):
+        self.config = self.get_default_config()
         self.env_vars = self.load_env_vars()
+        self.update_config_from_env()
     
     def load_env_vars(self) -> Dict:
         """Load environment variables from .env file"""
@@ -71,34 +71,30 @@ class AutomationConfig:
             'gemini_api_key': os.getenv('GEMINI_API_KEY'),
             'pexels_api_key': os.getenv('PEXELS_API_KEY'),
             'pixabay_api_key': os.getenv('PIXABAY_API_KEY'),
-            'video_resolution': os.getenv('VIDEO_RESOLUTION', '1080x1920'),
+            'video_resolution': os.getenv('VIDEO_RESOLUTION', '1920x1080'),
             'video_fps': int(os.getenv('VIDEO_FPS', '24')),
             'target_duration': int(os.getenv('TARGET_VIDEO_DURATION', '30')),
-            'output_format': os.getenv('OUTPUT_FORMAT', 'short'),
+            'output_format': os.getenv('OUTPUT_FORMAT', 'longform'),
             'batch_size': int(os.getenv('BATCH_SIZE', '1')),
             'upload_schedule_hours': int(os.getenv('UPLOAD_SCHEDULE_HOURS', '12')),
             'local_timezone': os.getenv('LOCAL_TIMEZONE', 'UTC'),
             'dry_run': os.getenv('DRY_RUN', 'false').lower() == 'true',
             'cleanup_temp': os.getenv('CLEANUP_TEMP', 'true').lower() == 'true',
+            'auto_upload': os.getenv('AUTO_UPLOAD', 'false').lower() == 'true',
+            'youtube_privacy_status': os.getenv('YOUTUBE_PRIVACY_STATUS', 'private'),
         }
     
-    def load_credentials(self) -> Dict:
-        """Load YouTube credentials from credentials.json"""
-        if os.path.exists('credentials.json'):
-            try:
-                with open('credentials.json', 'r') as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning(f"Failed to load credentials.json: {e}")
-        return {}
-    
-    def load_config(self) -> Dict:
-        """Load configuration from file"""
-        if os.path.exists(self.config_file):
-            with open(self.config_file, 'r') as f:
-                return json.load(f)
-        else:
-            return self.get_default_config()
+    def update_config_from_env(self):
+        """Override default config with environment variables"""
+        if self.env_vars.get('upload_schedule_hours'):
+             self.config['upload_schedule'] = 'custom'
+        
+        # Override auto_upload from env
+        self.config['auto_upload'] = self.env_vars['auto_upload']
+        
+        # Override privacy status
+        if self.env_vars['youtube_privacy_status'].lower() == 'public':
+            self.config['upload_as_public'] = True
     
     def get_default_config(self) -> Dict:
         """Get default configuration"""
@@ -109,7 +105,7 @@ class AutomationConfig:
             'audio_language': 'english',  # english, hindi, etc
             'subtitles': True,
             'auto_upload': False,  # Set to True once credentials configured
-            'upload_as_public': False,  # Start as unlisted for review
+            'upload_as_public': False,  # Start as unlisted by default
             'generate_thumbnail': True,
             'enable_premiere': False,
             'ideal_upload_time': '18:00',  # UTC time
@@ -127,13 +123,12 @@ class AutomationConfig:
 class YouTubeAutomationPipeline:
     """Main automation pipeline"""
     
-    def __init__(self, config_file: str = 'config.json', youtube_credentials: str = None):
-        """Initialize automation pipeline with credentials from .env and credential files"""
+    def __init__(self):
+        """Initialize automation pipeline with credentials from .env"""
         
-        self.config_handler = AutomationConfig(config_file)
+        self.config_handler = AutomationConfig()
         self.config = self.config_handler.config
         self.env_vars = self.config_handler.env_vars
-        self.credentials = self.config_handler.credentials
         
         logger.info("="*80)
         logger.info("YOUTUBE AUTOMATION PIPELINE INITIALIZING")
@@ -152,18 +147,9 @@ class YouTubeAutomationPipeline:
         self.thumbnail_generator = ThumbnailGenerator()
         self.youtube_uploader = None
         
-        # Initialize YouTube uploader with credentials from .env or credentials.json
-        # Try credentials.json first, then use env vars as fallback
-        if os.path.exists('credentials.json'):
-            self.youtube_uploader = YouTubeUploader(credentials_file='credentials.json')
-            logger.info("[OK] YouTube uploader initialized with credentials.json")
-        elif youtube_credentials and os.path.exists(youtube_credentials):
-            self.youtube_uploader = YouTubeUploader(credentials_file=youtube_credentials)
-            logger.info(f"[OK] YouTube uploader initialized with {youtube_credentials}")
-        elif self.env_vars['youtube_refresh_token']:
-            logger.info("[OK] YouTube credentials available from .env (will use OAuth)")
-        else:
-            logger.warning("[!] YouTube credentials not found (upload will be skipped)")
+        # Initialize YouTube uploader with environment variables
+        self.youtube_uploader = YouTubeUploader()
+        logger.info("[OK] YouTube uploader initialized (using env vars)")
         
         # Setup directories
         self.setup_directories()
@@ -202,6 +188,24 @@ class YouTubeAutomationPipeline:
         """Step 3: Optimize title, description, tags"""
         logger.info("🎯 Step 3: Optimizing metadata for SEO...")
         
+        # Extract full script text for analysis to avoid dumping raw JSON
+        script_text = ""
+        if isinstance(script, dict):
+            if 'scenes' in script:
+                # Handle both list and dict scene formats
+                scenes = script['scenes']
+                if isinstance(scenes, dict):
+                    for scene in scenes.values():
+                        script_text += scene.get('narration', '') + " "
+                elif isinstance(scenes, list):
+                    for scene in scenes:
+                        script_text += scene.get('narration', '') + " "
+            elif 'script' in script:
+                script_text = script['script']
+        
+        if not script_text:
+            script_text = idea.get('description', '')
+
         optimized = {
             'title': self.seo_optimizer.optimize_title(
                 idea['title'],
@@ -210,7 +214,7 @@ class YouTubeAutomationPipeline:
             ),
             'description': self.seo_optimizer.generate_description(
                 idea['title'],
-                str(script),
+                script_text,
                 [idea.get('keyword', '')] + idea.get('seo_tags', [])
             ),
             'tags': self.seo_optimizer.generate_tags(
@@ -221,7 +225,7 @@ class YouTubeAutomationPipeline:
                 idea['title'],
                 self.seo_optimizer.generate_description(
                     idea['title'],
-                    str(script),
+                    script_text,
                     [idea.get('keyword', '')] + idea.get('seo_tags', [])
                 ),
                 self.seo_optimizer.generate_tags(
@@ -274,17 +278,25 @@ class YouTubeAutomationPipeline:
             final_clip = concatenate_videoclips(clips)
             
             # Write video
-            video_path = "video/final_video.mp4"
+            # Write final video
             logger.info("   Writing video file...")
+            video_path = "video/final_video.mp4"
             final_clip.write_videofile(video_path, fps=24, codec="libx264",
-                                      audio_codec="aac", verbose=False)
+                                     audio_codec="aac", threads=4,
+                                     logger="bar")
             
-            logger.info(f"✅ Video created: {video_path}")
+            # Cleanup clips
+            final_clip.close()
+            for clip in clips:
+                clip.close()
+                
+            logger.info(f"✅ Video created successfully: {video_path}")
             
             # Add subtitles if enabled
             if self.config.get('subtitles'):
                 logger.info("   Adding subtitles...")
                 gen_subs(output_srt_path='subtitles.srt',
+                        input_video_path=video_path,
                         output_video_path='video/final_video_with_subs.mp4',
                         video_format=self.config.get('video_format'))
                 video_path = 'video/final_video_with_subs.mp4'
@@ -301,19 +313,22 @@ class YouTubeAutomationPipeline:
         logger.info("🖼️  Step 5: Generating thumbnail...")
         
         try:
-            thumbnail = self.thumbnail_generator.generate_ranking_thumbnail(
-                idea['title'],
-                number=1,
-                color='red'
-            )
-            
-            thumbnail_path = f"thumbnails/{idea['keyword']}_thumb.jpg"
             os.makedirs("thumbnails", exist_ok=True)
-            self.thumbnail_generator.save_thumbnail(thumbnail, thumbnail_path)
+            thumbnail_path = f"thumbnails/{idea['keyword']}_thumb.jpg"
             
-            logger.info(f"✅ Thumbnail generated: {thumbnail_path}")
+            # Use the new stunning thumbnail generator
+            # Use title as text overlay, but keep it short if possible
+            title = idea['title']
+            # Limit text length for visual appeal if needed, but gen_thumbnail handles wrapping
             
-            return thumbnail_path
+            gen_thumbnail(prompt=title, image_path=thumbnail_path, text_overlay=title)
+            
+            if os.path.exists(thumbnail_path):
+                logger.info(f"✅ Thumbnail generated: {thumbnail_path}")
+                return thumbnail_path
+            else:
+                logger.warning("⚠️  Thumbnail file not found after generation.")
+                return None
             
         except Exception as e:
             logger.error(f"⚠️  Thumbnail generation failed: {e}")
@@ -557,16 +572,12 @@ def main():
     parser.add_argument('--schedule', action='store_true', help='Schedule pipeline to run periodically')
     parser.add_argument('--hours', type=int, default=24, help='Hours between runs (with --schedule)')
     parser.add_argument('--manual', action='store_true', help='Save metadata for manual review')
-    parser.add_argument('--config', default='config.json', help='Configuration file')
-    parser.add_argument('--youtube-creds', default='credentials.json', help='YouTube credentials file')
+
     
     args = parser.parse_args()
     
     # Initialize pipeline
-    pipeline = YouTubeAutomationPipeline(
-        config_file=args.config,
-        youtube_credentials=args.youtube_creds
-    )
+    pipeline = YouTubeAutomationPipeline()
     
     if args.run:
         # Run once
