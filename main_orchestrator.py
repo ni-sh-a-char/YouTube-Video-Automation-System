@@ -248,6 +248,16 @@ class YouTubeAutomationPipeline:
             os.makedirs("audio", exist_ok=True)
             os.makedirs("video", exist_ok=True)
             
+            # Parse resolution from config
+            res_str = self.env_vars.get('video_resolution', '1920x1080')
+            try:
+                width, height = map(int, res_str.lower().split('x'))
+            except ValueError:
+                logger.warning(f"Invalid resolution format: {res_str}. Defaulting to 1920x1080")
+                width, height = 1920, 1080
+            
+            logger.info(f"   Target Video Resolution: {width}x{height}")
+
             from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
             
             clips = []
@@ -257,10 +267,10 @@ class YouTubeAutomationPipeline:
                 image_path = f"images/image_{scene_num}.png"
                 audio_path = f"audio/voice_{scene_num}.wav"
                 
-                # Generate image
+                # Generate image with correct dimensions
                 if not os.path.exists(image_path):
                     logger.info(f"   Generating image {scene_num}...")
-                    gen_image(scene_data['image-prompt'], image_path)
+                    gen_image(scene_data['image-prompt'], image_path, width=width, height=height)
                 
                 # Generate audio
                 if not os.path.exists(audio_path):
