@@ -11,19 +11,32 @@ def gen_subs(output_srt_path, input_video_path, output_video_path, video_format,
     Uses imageio-ffmpeg to ensure ffmpeg is available.
     """
     # Ensure ffmpeg is available
-    ffmpeg_exe = 'ffmpeg'
+    import platform
+    import stat
+    
+    is_windows = platform.system() == "Windows"
+    ffmpeg_filename = "ffmpeg.exe" if is_windows else "ffmpeg"
+    
     try:
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
         
         # Whisper expects 'ffmpeg' to be in PATH, but imageio might have a weird name
-        # So we copy it to a local bin folder as 'ffmpeg.exe'
+        # So we copy it to a local bin folder as 'ffmpeg' (or 'ffmpeg.exe')
         bin_dir = os.path.join(os.getcwd(), 'bin')
         os.makedirs(bin_dir, exist_ok=True)
         
-        dest_ffmpeg = os.path.join(bin_dir, 'ffmpeg.exe')
+        dest_ffmpeg = os.path.join(bin_dir, ffmpeg_filename)
+        
+        # Always copy if missing or update if needed (simple check: if not exists)
         if not os.path.exists(dest_ffmpeg):
             print(f"DEBUG: Copying {ffmpeg_exe} to {dest_ffmpeg}...")
             shutil.copy(ffmpeg_exe, dest_ffmpeg)
+            
+            # Make executable on Linux/Mac
+            if not is_windows:
+                st = os.stat(dest_ffmpeg)
+                os.chmod(dest_ffmpeg, st.st_mode | stat.S_IEXEC)
+                print(f"DEBUG: Made {dest_ffmpeg} executable")
             
         # Prepend bin to PATH
         os.environ["PATH"] = bin_dir + os.pathsep + os.environ["PATH"]
